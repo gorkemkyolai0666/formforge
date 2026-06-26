@@ -1,0 +1,10 @@
+.env
+.env.local
+.env.production
+!.env.example
+.vercel/
+frontend/.vercel
+node_modules/
+dist/
+.next/
+*.log

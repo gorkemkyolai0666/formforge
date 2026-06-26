@@ -1,0 +1,186 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum PlanType {
+  FREE
+  PRO
+  BUSINESS
+}
+
+enum FormStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum FieldType {
+  SHORT_TEXT
+  LONG_TEXT
+  EMAIL
+  NUMBER
+  PHONE
+  DATE
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  DROPDOWN
+  RATING
+  NPS
+  LIKERT
+  FILE_UPLOAD
+  SIGNATURE
+  RANKING
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  password      String
+  name          String?
+  avatar        String?
+  plan          PlanType       @default(FREE)
+  aiCredits     Int            @default(5)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  forms         Form[]
+  notifications Notification[]
+  subscription  Subscription?
+}
+
+model Form {
+  id            String         @id @default(uuid())
+  userId        String
+  title         String
+  description   String?
+  status        FormStatus     @default(DRAFT)
+  themeColor    String         @default("#FF6B4A")
+  bgColor       String         @default("#F8F9FC")
+  logoUrl       String?
+  thankYouTitle String         @default("Teşekkürler!")
+  thankYouMsg   String         @default("Yanıtınız başarıyla kaydedildi.")
+  responseCount Int            @default(0)
+  viewCount     Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fields        Field[]
+  responses     FormResponse[]
+  analytics     FormAnalytics[]
+
+  @@index([userId])
+}
+
+model Field {
+  id           String      @id @default(uuid())
+  formId       String
+  type         FieldType
+  label        String
+  description  String?
+  placeholder  String?
+  required     Boolean     @default(false)
+  options      Json?
+  validation   Json?
+  order        Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  form         Form        @relation(fields: [formId], references: [id], onDelete: Cascade)
+  answers      Answer[]
+  logicRules   FieldLogic[] @relation("sourceField")
+  logicTargets FieldLogic[] @relation("targetField")
+
+  @@index([formId])
+  @@unique([formId, order])
+}
+
+model FieldLogic {
+  id            String   @id @default(uuid())
+  sourceFieldId String
+  targetFieldId String
+  condition     String
+  value         String
+  action        String   @default("SHOW")
+  createdAt     DateTime @default(now())
+  sourceField   Field    @relation("sourceField", fields: [sourceFieldId], references: [id], onDelete: Cascade)
+  targetField   Field    @relation("targetField", fields: [targetFieldId], references: [id], onDelete: Cascade)
+
+  @@index([sourceFieldId])
+}
+
+model FormResponse {
+  id              String   @id @default(uuid())
+  formId          String
+  respondentEmail String?
+  respondentName  String?
+  ipAddress       String?
+  userAgent       String?
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  duration        Int?
+  isComplete      Boolean  @default(false)
+  metadata        Json?
+  form            Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  answers         Answer[]
+
+  @@index([formId])
+}
+
+model Answer {
+  id         String       @id @default(uuid())
+  responseId String
+  fieldId    String
+  value      String
+  createdAt  DateTime     @default(now())
+  response   FormResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  field      Field        @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@index([responseId])
+  @@index([fieldId])
+}
+
+model FormAnalytics {
+  id              String   @id @default(uuid())
+  formId          String
+  date            DateTime @default(now())
+  views           Int      @default(0)
+  starts          Int      @default(0)
+  completions     Int      @default(0)
+  avgDuration     Int?
+  dropOffFieldId  String?
+  form            Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([formId])
+  @@index([date])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  type      String   @default("info")
+  link      String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Subscription {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  plan          PlanType @default(FREE)
+  credits       Int      @default(5)
+  maxForms      Int      @default(3)
+  maxResponses  Int      @default(100)
+  billingCycle  String   @default("monthly")
+  expiresAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
